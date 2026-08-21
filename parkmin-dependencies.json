@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "gitDependencies": [
+    {
+      "packageName": "com.parkminpackages.workflow.default",
+      "version": "9.1.4",
+      "url": "https://github.com/ParkMinPackages/Workflow-Default.git"
+    }
+  ],
+  "nugetDependencies": []
+}

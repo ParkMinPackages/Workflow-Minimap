@@ -1,0 +1,16 @@
+{
+  "name": "ParkMinPackages.Workflow.Minimap",
+  "rootNamespace": "ParkMinPackages.Workflow.Minimap",
+  "references": [
+    "GUID:bb176cf1d663ca749a0ada78a72f5c2b"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

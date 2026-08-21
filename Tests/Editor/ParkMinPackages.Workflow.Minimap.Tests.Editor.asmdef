@@ -1,0 +1,14 @@
+{
+  "name": "ParkMinPackages.Workflow.Minimap.Tests.Editor",
+  "rootNamespace": "ParkMinPackages.Workflow.Minimap.Tests.Editor",
+  "references": [
+    "GUID:d6dd4d24c2ca42d5a97a4279606d29f4",
+    "GUID:eeb71356710c4c0681cf0af351941ed4"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

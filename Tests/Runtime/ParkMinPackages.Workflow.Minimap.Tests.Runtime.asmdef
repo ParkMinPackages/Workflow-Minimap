@@ -1,0 +1,10 @@
+{
+  "name": "ParkMinPackages.Workflow.Minimap.Tests.Runtime",
+  "rootNamespace": "ParkMinPackages.Workflow.Minimap.Tests.Runtime",
+  "references": [
+    "GUID:d6dd4d24c2ca42d5a97a4279606d29f4"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}
