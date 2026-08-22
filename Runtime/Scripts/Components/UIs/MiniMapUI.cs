@@ -47,6 +47,14 @@ namespace ParkMinPackages.Workflow.Minimap
 
 			SetViewImmediate(center, rotation, validatedViewWorldHeight);
 		}
+		public void SnapToTargetView() {
+			if (_hasTargetView == false)
+				return;
+
+			_hasTargetView = false;
+			SetViewImmediate(_targetCenter, _targetRotation, _targetViewWorldHeight);
+			UpdateMarkers();
+		}
 
 		public Vector2 WorldToMiniMapPoint(Vector3 worldPosition) {
 			if (_captureData == null)
