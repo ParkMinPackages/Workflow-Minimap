@@ -69,7 +69,7 @@ namespace ParkMinPackages.Workflow.Minimap
 			return _markerContainer.InverseTransformPoint(worldPoint);
 		}
 
-		public T CreateMarker<T>(Transform target, T markerPrefab) where T : MiniMapMarker {
+		public T CreateMarker<T>(Transform target, T markerPrefab) where T : MiniMapMarkerUI {
 			if (target == null) throw new ArgumentNullException(nameof(target));
 			if (markerPrefab == null) throw new ArgumentNullException(nameof(markerPrefab));
 			if (_markerContainer == null) throw new NullReferenceException(nameof(_markerContainer));
@@ -81,18 +81,18 @@ namespace ParkMinPackages.Workflow.Minimap
 		}
 
 		public void DestroyMarker(
-			MiniMapMarker marker,
-			Action<MiniMapMarker> destroyAction = null
+			MiniMapMarkerUI markerUI,
+			Action<MiniMapMarkerUI> destroyAction = null
 		) {
-			if (marker == null)
+			if (markerUI == null)
 				return;
 
-			RemoveMarker(marker);
-			Action<MiniMapMarker> resolvedDestroyAction = destroyAction ?? marker.DestroyAction;
+			RemoveMarker(markerUI);
+			Action<MiniMapMarkerUI> resolvedDestroyAction = destroyAction ?? markerUI.DestroyAction;
 			if (resolvedDestroyAction != null)
-				resolvedDestroyAction(marker);
+				resolvedDestroyAction(markerUI);
 			else
-				Destroy(marker.gameObject);
+				Destroy(markerUI.gameObject);
 		}
 
 		public void R3PostLateUpdate() {
@@ -207,7 +207,7 @@ namespace ParkMinPackages.Workflow.Minimap
 		[SerializeField, Min(0.01f)] float _viewWorldHeight = 30f;
 		[SerializeField] bool _smoothingEnabled;
 		[SerializeField, ShowIf(nameof(_smoothingEnabled)), Min(0.01f)] float _smoothness = 10f;
-		readonly List<MiniMapMarker> _markers = new List<MiniMapMarker>();
+		readonly List<MiniMapMarkerUI> _markers = new List<MiniMapMarkerUI>();
 		MiniMapCamera.SpriteCaptureData _captureData;
 		Vector3 _center;
 		Vector3 _targetCenter;
@@ -292,28 +292,28 @@ namespace ParkMinPackages.Workflow.Minimap
 
 			_markerContainer.GetComponentsInChildren(true, _markers);
 			for (int i = 0; i < _markers.Count; i++) {
-				MiniMapMarker marker = _markers[i];
-				marker.DestroyRequested += HandleMarkerDestroyRequested;
-				marker.Refresh();
+				MiniMapMarkerUI markerUI = _markers[i];
+				markerUI.DestroyRequested += HandleMarkerDestroyRequested;
+				markerUI.Refresh();
 			}
 		}
 
-		void AddMarker(MiniMapMarker marker) {
-			if (_markers.Contains(marker))
+		void AddMarker(MiniMapMarkerUI markerUI) {
+			if (_markers.Contains(markerUI))
 				return;
 
-			_markers.Add(marker);
-			marker.DestroyRequested += HandleMarkerDestroyRequested;
-			marker.Refresh();
+			_markers.Add(markerUI);
+			markerUI.DestroyRequested += HandleMarkerDestroyRequested;
+			markerUI.Refresh();
 		}
 
-		void RemoveMarker(MiniMapMarker marker) {
-			if (_markers.Remove(marker))
-				marker.DestroyRequested -= HandleMarkerDestroyRequested;
+		void RemoveMarker(MiniMapMarkerUI markerUI) {
+			if (_markers.Remove(markerUI))
+				markerUI.DestroyRequested -= HandleMarkerDestroyRequested;
 		}
 
-		void HandleMarkerDestroyRequested(MiniMapMarker marker) {
-			DestroyMarker(marker);
+		void HandleMarkerDestroyRequested(MiniMapMarkerUI markerUI) {
+			DestroyMarker(markerUI);
 		}
 
 		void UpdateMarkers() {
@@ -321,44 +321,44 @@ namespace ParkMinPackages.Workflow.Minimap
 				return;
 
 			for (int i = _markers.Count - 1; 0 <= i; i--) {
-				MiniMapMarker marker = _markers[i];
-				if (marker == null) {
+				MiniMapMarkerUI markerUI = _markers[i];
+				if (markerUI == null) {
 					_markers.RemoveAt(i);
 					continue;
 				}
-				if (marker.Target == null) {
-					marker.SetOutOfBounds(false);
-					marker.Hide();
+				if (markerUI.Target == null) {
+					markerUI.SetOutOfBounds(false);
+					markerUI.Hide();
 					continue;
 				}
-				if (marker.IsTargetStatic && marker.AppliedViewVersion == _viewVersion)
+				if (markerUI.IsTargetStatic && markerUI.AppliedViewVersion == _viewVersion)
 					continue;
 
-				ApplyMarker(marker);
-				marker.AppliedViewVersion = _viewVersion;
+				ApplyMarker(markerUI);
+				markerUI.AppliedViewVersion = _viewVersion;
 			}
 		}
 
-		void ApplyMarker(MiniMapMarker marker) {
-			Vector2 markerPoint = WorldToMiniMapPoint(marker.WorldPosition);
+		void ApplyMarker(MiniMapMarkerUI markerUI) {
+			Vector2 markerPoint = WorldToMiniMapPoint(markerUI.WorldPosition);
 			Rect containerRect = _markerContainer.rect;
 			bool isOutOfBounds = containerRect.Contains(markerPoint) == false;
-			marker.SetOutOfBounds(isOutOfBounds);
-			if (marker.OutOfBounds == MiniMapMarker.OutOfBoundsMode.Hide && isOutOfBounds) {
-				marker.Hide();
+			markerUI.SetOutOfBounds(isOutOfBounds);
+			if (markerUI.OutOfBounds == MiniMapMarkerUI.OutOfBoundsMode.Hide && isOutOfBounds) {
+				markerUI.Hide();
 				return;
 			}
 
-			RectTransform markerRectTransform = marker.RectTransform;
+			RectTransform markerRectTransform = markerUI.RectTransform;
 			Vector3 localPosition = markerRectTransform.localPosition;
 			markerRectTransform.localPosition = new Vector3(markerPoint.x, markerPoint.y, localPosition.z);
-			markerRectTransform.localRotation = marker.Rotation == MiniMapMarker.RotationMode.WorldDirection
-				? Quaternion.Euler(0f, 0f, _rotation - marker.WorldYaw)
+			markerRectTransform.localRotation = markerUI.Rotation == MiniMapMarkerUI.RotationMode.WorldDirection
+				? Quaternion.Euler(0f, 0f, _rotation - markerUI.WorldYaw)
 				: Quaternion.identity;
 
-			if (marker.OutOfBounds == MiniMapMarker.OutOfBoundsMode.Clamp)
+			if (markerUI.OutOfBounds == MiniMapMarkerUI.OutOfBoundsMode.Clamp)
 				ClampMarker(markerRectTransform, containerRect);
-			marker.Show();
+			markerUI.Show();
 		}
 
 		void ClampMarker(RectTransform markerRectTransform, Rect containerRect) {

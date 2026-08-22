@@ -12,7 +12,7 @@ using UnityEngine.UI;
 namespace ParkMinPackages.Workflow.Minimap
 {
 	[RequireComponent(typeof(Image))]
-	public class MiniMapMarker : Actor, IShowHideUI
+	public class MiniMapMarkerUI : Actor, IShowHideUI
 	{
 		// - Class Struct Enum -
 		public enum RotationMode
@@ -117,7 +117,7 @@ namespace ParkMinPackages.Workflow.Minimap
 		{
 			get { return _isOutOfBounds; }
 		}
-		public Action<MiniMapMarker> DestroyAction { get; set; }
+		public Action<MiniMapMarkerUI> DestroyAction { get; set; }
 
 		// - Handler -
 		protected override void Awake() {
@@ -152,7 +152,7 @@ namespace ParkMinPackages.Workflow.Minimap
 		float _cachedWorldYaw;
 		bool _isVisible;
 
-		internal event Action<MiniMapMarker> DestroyRequested;
+		internal event Action<MiniMapMarkerUI> DestroyRequested;
 		internal int AppliedViewVersion { get; set; } = -1;
 		internal Vector3 WorldPosition
 		{
