@@ -2,7 +2,11 @@
   "name": "ParkMinPackages.Workflow.Minimap",
   "rootNamespace": "ParkMinPackages.Workflow.Minimap",
   "references": [
-    "GUID:bb176cf1d663ca749a0ada78a72f5c2b"
+    "GUID:bb176cf1d663ca749a0ada78a72f5c2b",
+    "GUID:71a72178c26810b4fb6e1516407e5558",
+    "GUID:77221876cc6b8244180b96e320b1bcd4",
+    "GUID:529eb8310bc2c4a44a1831a13f882fe4",
+    "GUID:f51ebe6a0ceec4240a699833d6309b23"
   ],
   "includePlatforms": [],
   "excludePlatforms": [],

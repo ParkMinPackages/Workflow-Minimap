@@ -1,14 +1,16 @@
 {
   "name": "com.parkminpackages.workflow.minimap",
   "displayName": "ParkMinPackages.Workflow.Minimap",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "license": "MIT",
   "documentationUrl": "https://github.com/ParkMinPackages/Workflow-Minimap#readme",
   "changelogUrl": "https://github.com/ParkMinPackages/Workflow-Minimap/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/ParkMinPackages/Workflow-Minimap/blob/main/LICENSE.md",
   "unity": "6000.5",
   "description": "A reusable minimap workflow package for Unity projects maintained by ParkMinPackages.",
-  "dependencies": {},
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  },
   "author": {
     "name": "ParkMinPackages",
     "url": "https://github.com/ParkMinPackages"
