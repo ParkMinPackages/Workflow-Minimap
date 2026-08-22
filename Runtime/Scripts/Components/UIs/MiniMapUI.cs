@@ -16,8 +16,7 @@ namespace ParkMinPackages.Workflow.Minimap
 	public class MiniMapUI : BasicUI, IMiniMapUI, IR3PostLateUpdatable
 	{
 		// - Public Methods -
-		public void Initialize() {
-			MiniMapCamera miniMapCamera = MiniMapCamera;
+		public void Initialize(MiniMapCamera miniMapCamera) {
 			if (miniMapCamera == null) throw new NullReferenceException();
 
 			MiniMapCamera.SpriteCaptureData captureData = miniMapCamera.CaptureSprite();
@@ -101,20 +100,6 @@ namespace ParkMinPackages.Workflow.Minimap
 		}
 
 		// - Public Properties -
-		public MiniMapCamera MiniMapCamera
-		{
-			get
-			{
-				if (_miniMapCamera == null) {
-					if (Application.isPlaying)
-						_miniMapCamera = Actor.GetEnumerable<MiniMapCamera>().FirstOrDefault(camera => camera.ID == ID);
-					else
-						_miniMapCamera = FindObjectsByType<MiniMapCamera>().FirstOrDefault(camera => camera.ID == ID);
-				}
-				return _miniMapCamera;
-			}
-			set { _miniMapCamera = value; }
-		}
 		public Image MiniMapImage
 		{
 			get { return _miniMapImage; }
@@ -179,8 +164,15 @@ namespace ParkMinPackages.Workflow.Minimap
 		// - Handler -
 		protected override void Start() {
 			base.Start();
-			if (_initializeOnStart)
-				Initialize();
+			if (_initializeOnStart) {
+				MiniMapCamera miniMapCamera = null;
+				if (Application.isPlaying)
+					miniMapCamera = Actor.GetEnumerable<MiniMapCamera>().FirstOrDefault(camera => camera.ID == ID);
+				else
+					miniMapCamera = FindObjectsByType<MiniMapCamera>().FirstOrDefault(camera => camera.ID == ID);
+
+				Initialize(miniMapCamera);
+			}
 		}
 
 		void OnRectTransformDimensionsChange() {
@@ -201,7 +193,6 @@ namespace ParkMinPackages.Workflow.Minimap
 
 		// - Internals -
 		[SerializeField] bool _initializeOnStart;
-		[SerializeField, ShowIf(nameof(_initializeOnStart))] MiniMapCamera _miniMapCamera;
 		[SerializeField, Required] Image _miniMapImage;
 		[SerializeField, Required] RectTransform _markerContainer;
 		[SerializeField, Min(0.01f)] float _viewWorldHeight = 30f;
@@ -223,8 +214,8 @@ namespace ParkMinPackages.Workflow.Minimap
 			float viewWorldHeight
 		) {
 			bool changed = _center != center ||
-				Mathf.Approximately(_rotation, rotation) == false ||
-				Mathf.Approximately(_viewWorldHeight, viewWorldHeight) == false;
+			               Mathf.Approximately(_rotation, rotation) == false ||
+			               Mathf.Approximately(_viewWorldHeight, viewWorldHeight) == false;
 			_center = center;
 			_rotation = rotation;
 			_viewWorldHeight = viewWorldHeight;
@@ -237,8 +228,8 @@ namespace ParkMinPackages.Workflow.Minimap
 			if (_smoothingEnabled == false || _hasTargetView == false)
 				return;
 			if (_center == _targetCenter &&
-				Mathf.Approximately(_rotation, _targetRotation) &&
-				Mathf.Approximately(_viewWorldHeight, _targetViewWorldHeight))
+			    Mathf.Approximately(_rotation, _targetRotation) &&
+			    Mathf.Approximately(_viewWorldHeight, _targetViewWorldHeight))
 				return;
 
 			float interpolation = 1f - Mathf.Exp(-_smoothness * Time.deltaTime);

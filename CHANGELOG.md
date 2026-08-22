@@ -5,6 +5,13 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-08-22
+
+### Changed
+- Changed `MiniMapUI.Initialize()` to require an explicit `MiniMapCamera` argument.
+- Removed the serialized camera reference and public camera property from `MiniMapUI`.
+- Kept start-time initialization by resolving the camera with the matching actor ID.
+
 ## [3.0.0] - 2026-08-22
 
 ### Changed
