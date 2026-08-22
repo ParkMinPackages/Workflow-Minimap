@@ -18,6 +18,7 @@ namespace ParkMinPackages.Workflow.Minimap
 		// - Public Methods -
 		public void Initialize(MiniMapCamera miniMapCamera) {
 			if (miniMapCamera == null) throw new NullReferenceException();
+			InitializeHierarchy();
 
 			MiniMapCamera.SpriteCaptureData captureData = miniMapCamera.CaptureSprite();
 			_captureData?.Dispose();
@@ -207,6 +208,25 @@ namespace ParkMinPackages.Workflow.Minimap
 		float _targetViewWorldHeight;
 		int _viewVersion;
 		bool _hasTargetView;
+
+		void InitializeHierarchy() {
+			if (_miniMapImage == null)
+				throw new NullReferenceException(nameof(_miniMapImage));
+			if (_markerContainer == null)
+				throw new NullReferenceException(nameof(_markerContainer));
+			if (_miniMapImage.rectTransform.parent != transform)
+				throw new InvalidOperationException($"{nameof(MiniMapImage)} must be a direct child of {nameof(MiniMapUI)}.");
+			if (_markerContainer.parent != transform)
+				throw new InvalidOperationException($"{nameof(MarkerContainer)} must be a direct child of {nameof(MiniMapUI)}.");
+
+			_markerContainer.anchorMin = Vector2.zero;
+			_markerContainer.anchorMax = Vector2.one;
+			_markerContainer.offsetMin = Vector2.zero;
+			_markerContainer.offsetMax = Vector2.zero;
+			_markerContainer.localScale = Vector3.one;
+			_miniMapImage.rectTransform.SetAsFirstSibling();
+			_markerContainer.SetAsLastSibling();
+		}
 
 		void SetViewImmediate(
 			Vector3 center,

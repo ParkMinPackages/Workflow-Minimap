@@ -150,7 +150,7 @@ namespace ParkMinPackages.Workflow.Minimap
 		IDisposable _targetDestroySubscription;
 		Vector3 _cachedWorldPosition;
 		float _cachedWorldYaw;
-		bool _isVisible;
+		bool _isVisible = true;
 
 		internal event Action<MiniMapMarkerUI> DestroyRequested;
 		internal int AppliedViewVersion { get; set; } = -1;
