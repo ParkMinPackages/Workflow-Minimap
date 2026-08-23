@@ -102,6 +102,13 @@ namespace ParkMinPackages.Workflow.Minimap
 			else
 				Destroy(markerUI.gameObject);
 		}
+		public void ClearMarkers(
+			Action<MiniMapMarkerUI> destroyAction = null
+		) {
+			MiniMapMarkerUI[] markerUIs = _markers.ToArray();
+			for (int i = 0; i < markerUIs.Length; i++)
+				DestroyMarker(markerUIs[i], destroyAction);
+		}
 
 		public void R3PostLateUpdate() {
 			UpdateSmoothedView();
@@ -116,6 +123,10 @@ namespace ParkMinPackages.Workflow.Minimap
 		public RectTransform MarkerContainer
 		{
 			get { return _markerContainer; }
+		}
+		public IReadOnlyList<MiniMapMarkerUI> Markers
+		{
+			get { return _markers; }
 		}
 		public Vector3 Center
 		{
