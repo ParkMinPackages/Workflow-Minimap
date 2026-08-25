@@ -1,11 +1,13 @@
 using System;
 using Cysharp.Threading.Tasks;
+using ParkMinPackages.Foundation.Constants;
 using ParkMinPackages.Foundation.Objects.Threading;
 using ParkMinPackages.UGUI.Components;
 using ParkMinPackages.Workflow.Default.Components;
 using ParkMinPackages.Workflow.Default.Interfaces;
 using R3;
 using R3.Triggers;
+using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -28,6 +30,16 @@ namespace ParkMinPackages.Workflow.Minimap
 		}
 
 		// - Public Methods -
+		public void Initialize(Transform target) {
+			if (target == null)
+				throw new ArgumentNullException(nameof(target));
+
+			_targetDestroySubscription?.Dispose();
+			_target = target;
+			Refresh();
+			_targetDestroySubscription = _target.OnDestroyAsObservable().Subscribe(_ => Destroy(gameObject));
+		}
+
 		public void Show() {
 			if (_isVisible)
 				return;
@@ -55,22 +67,12 @@ namespace ParkMinPackages.Workflow.Minimap
 				_cachedWorldPosition = _target.position;
 				_cachedWorldYaw = _target.eulerAngles.y;
 			}
-			AppliedViewVersion = -1;
 		}
 
 		// - Public Properties -
 		public Transform Target
 		{
 			get { return _target; }
-			set
-			{
-				if (_target == value)
-					return;
-
-				_target = value;
-				ObserveTargetDestruction();
-				Refresh();
-			}
 		}
 		public Image Image
 		{
@@ -117,8 +119,6 @@ namespace ParkMinPackages.Workflow.Minimap
 		{
 			get { return _isOutOfBounds; }
 		}
-		public Action<MiniMapMarkerUI> DestroyAction { get; set; }
-
 		// - Handler -
 		protected override void Awake() {
 			base.Awake();
@@ -126,8 +126,8 @@ namespace ParkMinPackages.Workflow.Minimap
 			_rectTransform = (RectTransform)transform;
 			_uiActivator = GetComponent<UIActivator>();
 			_isVisible = _uiActivator != null ? _uiActivator.IsActive : _image.enabled;
-			ObserveTargetDestruction();
-			Refresh();
+			if (_target != null)
+				Initialize(_target);
 		}
 
 		protected override void OnDestroy() {
@@ -139,9 +139,13 @@ namespace ParkMinPackages.Workflow.Minimap
 		}
 
 		// - Internals -
+		[Title(Headers.Injectable)]
 		[SerializeField] Transform _target;
+
+		[Title(Headers.Settings)]
 		[SerializeField] RotationMode _rotationMode;
 		[SerializeField] OutOfBoundsMode _outOfBoundsMode;
+
 		readonly AutoRenewCancellationTokenSource _showHideCancellationTokenSource = new AutoRenewCancellationTokenSource();
 		readonly ReactiveProperty<bool> _isOutOfBounds = new ReactiveProperty<bool>(false);
 		Image _image;
@@ -152,8 +156,6 @@ namespace ParkMinPackages.Workflow.Minimap
 		float _cachedWorldYaw;
 		bool _isVisible = true;
 
-		internal event Action<MiniMapMarkerUI> DestroyRequested;
-		internal int AppliedViewVersion { get; set; } = -1;
 		internal Vector3 WorldPosition
 		{
 			get { return IsTargetStatic ? _cachedWorldPosition : _target.position; }
@@ -164,15 +166,6 @@ namespace ParkMinPackages.Workflow.Minimap
 		}
 		internal void SetOutOfBounds(bool isOutOfBounds) {
 			_isOutOfBounds.Value = isOutOfBounds;
-		}
-
-		void ObserveTargetDestruction() {
-			_targetDestroySubscription?.Dispose();
-			_targetDestroySubscription = null;
-			if (_target == null)
-				return;
-
-			_targetDestroySubscription = _target.OnDestroyAsObservable().Subscribe(_ => DestroyRequested?.Invoke(this));
 		}
 	}
 }

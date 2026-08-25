@@ -1,15 +1,14 @@
-﻿using ParkMinPackages.Workflow.Default.Components;
-
 using System;
-using UnityEngine;
-#if UNITY_EDITOR
+using ParkMinPackages.Foundation.Constants;
+using ParkMinPackages.Foundation.Interfaces;
+using ParkMinPackages.Workflow.Default.Components;
 using Sirenix.OdinInspector;
-#endif
+using UnityEngine;
 
 namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 {
 	[ExecuteAlways, RequireComponent(typeof(Camera))]
-	public class MiniMapCamera : Actor
+	public class MiniMapCamera : Actor, IR3Updatable
 	{
 		// - Class Struct Enum -
 		public abstract class CaptureData : IDisposable
@@ -42,7 +41,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 		public sealed class TextureCaptureData : CaptureData
 		{
 			// - Construct -
-			internal TextureCaptureData(
+			public TextureCaptureData(
 				Texture2D texture,
 				Vector2 worldCenter,
 				Vector2 worldSize,
@@ -70,7 +69,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 		public sealed class SpriteCaptureData : CaptureData
 		{
 			// - Construct -
-			internal SpriteCaptureData(
+			public SpriteCaptureData(
 				Sprite sprite,
 				Texture2D texture,
 				Vector2 worldCenter,
@@ -113,13 +112,13 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 
 		// - Public Methods -
 		public TextureCaptureData CaptureTexture() {
-			Vector2Int pixelSize = GetPixelSize();
+			Vector2Int pixelSize = OutputTextureSize;
 			Texture2D texture = CaptureTexture(pixelSize);
-			return new TextureCaptureData(texture, GetWorldCenter(), _captureWorldSize, pixelSize);
+			return new TextureCaptureData(texture, WorldCenter, _captureWorldSize, pixelSize);
 		}
 
 		public SpriteCaptureData CaptureSprite() {
-			Vector2Int pixelSize = GetPixelSize();
+			Vector2Int pixelSize = OutputTextureSize;
 			Texture2D texture = CaptureTexture(pixelSize);
 
 			try {
@@ -131,7 +130,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 					spritePixelsPerUnit
 				);
 				sprite.name = $"{name} MiniMap";
-				return new SpriteCaptureData(sprite, texture, GetWorldCenter(), _captureWorldSize, pixelSize);
+				return new SpriteCaptureData(sprite, texture, WorldCenter, _captureWorldSize, pixelSize);
 			}
 			catch {
 				DestroyResource(texture);
@@ -141,7 +140,6 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 
 		// - Handler -
 		protected override void Awake() {
-			EnsureCamera();
 			ApplyCameraSettings();
 
 #if UNITY_EDITOR
@@ -150,19 +148,18 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 #endif
 
 			if (Application.isPlaying) {
-				_camera.targetTexture = null;
-				_camera.enabled = false;
+				Camera.targetTexture = null;
+				Camera.enabled = false;
 			}
 
 			base.Awake();
 		}
 
 		protected override void OnEnable() {
-			EnsureCamera();
 			ApplyCameraSettings();
 
 			if (Application.isPlaying) {
-				_camera.enabled = false;
+				Camera.enabled = false;
 				base.OnEnable();
 				return;
 			}
@@ -173,11 +170,10 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 			base.OnEnable();
 		}
 
-		void Update() {
+		void IR3Updatable.R3Update() {
 			if (Application.isPlaying)
 				return;
 
-			EnsureCamera();
 			ApplyCameraSettings();
 
 #if UNITY_EDITOR
@@ -207,13 +203,13 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 			_farClipPlane = Mathf.Max(0.01f, _farClipPlane);
 			_pixelsPerUnit = Mathf.Max(1, _pixelsPerUnit);
 			_maximumTextureSize = Mathf.Max(1, _maximumTextureSize);
-			EnsureCamera();
 			ApplyCameraSettings();
 			base.OnValidate();
 		}
 #endif
 
 		// - Internals -
+		[Title(Headers.Settings)]
 		[SerializeField] Vector2 _captureWorldSize = new Vector2(32f, 32f);
 		[SerializeField, Min(0.01f)] float _cameraHeight = 100f;
 		[SerializeField, Min(0.01f)] float _farClipPlane = 200f;
@@ -221,64 +217,76 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 		[SerializeField, Min(1)] int _maximumTextureSize = 2048;
 		[SerializeField] FilterMode _filterMode = FilterMode.Bilinear;
 		[SerializeField] LayerMask _cullingMask = ~0;
+
 		Camera _camera;
 
 #if UNITY_EDITOR
 		RenderTexture _previewRenderTexture;
 		RenderTexture _previousTargetTexture;
 		bool _previousCameraEnabled;
+#endif
 
-		[ShowInInspector, ReadOnly, LabelText("Output Texture Size")] Vector2Int OutputTextureSize
+		Camera Camera
 		{
-			get { return GetPixelSize(); }
+			get
+			{
+				if (_camera == null)
+					_camera = GetComponent<Camera>();
+				return _camera;
+			}
 		}
-		[ShowInInspector, ReadOnly, PreviewField(256, ObjectFieldAlignment.Center)] RenderTexture EditorPreviewTexture
+		Vector2 WorldCenter
+		{
+			get
+			{
+				Vector3 position = transform.position;
+				return new Vector2(position.x, position.z);
+			}
+		}
+		[ShowInInspector, ReadOnly, LabelText("Output Texture Size")]
+		Vector2Int OutputTextureSize
+		{
+			get
+			{
+				int width = Mathf.Max(1, Mathf.CeilToInt(_captureWorldSize.x * _pixelsPerUnit));
+				int height = Mathf.Max(1, Mathf.CeilToInt(_captureWorldSize.y * _pixelsPerUnit));
+				int maximumDimension = Mathf.Max(width, height);
+
+				if (_maximumTextureSize < maximumDimension) {
+					float scale = _maximumTextureSize / (float)maximumDimension;
+					width = Mathf.Max(1, Mathf.RoundToInt(width * scale));
+					height = Mathf.Max(1, Mathf.RoundToInt(height * scale));
+				}
+
+				return new Vector2Int(width, height);
+			}
+		}
+#if UNITY_EDITOR
+		[ShowInInspector, ReadOnly, PreviewField(256, ObjectFieldAlignment.Center)]
+		RenderTexture EditorPreviewTexture
 		{
 			get { return _previewRenderTexture; }
 		}
 #endif
 
-		void EnsureCamera() {
-			if (_camera == null)
-				_camera = GetComponent<Camera>();
-		}
-
 		void ApplyCameraSettings() {
+			Camera camera = Camera;
 			Vector3 position = transform.position;
 			position.y = _cameraHeight;
 			transform.position = position;
 			transform.rotation = Quaternion.LookRotation(Vector3.down, Vector3.forward);
-			_camera.orthographic = true;
-			_camera.orthographicSize = _captureWorldSize.y * 0.5f;
-			_camera.aspect = _captureWorldSize.x / _captureWorldSize.y;
-			_camera.farClipPlane = _farClipPlane;
-			_camera.cullingMask = _cullingMask;
-		}
-
-		Vector2 GetWorldCenter() {
-			Vector3 position = transform.position;
-			return new Vector2(position.x, position.z);
-		}
-
-		Vector2Int GetPixelSize() {
-			int width = Mathf.Max(1, Mathf.CeilToInt(_captureWorldSize.x * _pixelsPerUnit));
-			int height = Mathf.Max(1, Mathf.CeilToInt(_captureWorldSize.y * _pixelsPerUnit));
-			int maximumDimension = Mathf.Max(width, height);
-
-			if (_maximumTextureSize < maximumDimension) {
-				float scale = _maximumTextureSize / (float)maximumDimension;
-				width = Mathf.Max(1, Mathf.RoundToInt(width * scale));
-				height = Mathf.Max(1, Mathf.RoundToInt(height * scale));
-			}
-
-			return new Vector2Int(width, height);
+			camera.orthographic = true;
+			camera.orthographicSize = _captureWorldSize.y * 0.5f;
+			camera.aspect = _captureWorldSize.x / _captureWorldSize.y;
+			camera.farClipPlane = _farClipPlane;
+			camera.cullingMask = _cullingMask;
 		}
 
 		Texture2D CaptureTexture(Vector2Int pixelSize) {
-			EnsureCamera();
 			ApplyCameraSettings();
+			Camera camera = Camera;
 
-			RenderTexture previousTargetTexture = _camera.targetTexture;
+			RenderTexture previousTargetTexture = camera.targetTexture;
 			RenderTexture previousActiveTexture = RenderTexture.active;
 			RenderTexture temporaryTexture = RenderTexture.GetTemporary(
 				pixelSize.x,
@@ -293,9 +301,9 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 			Texture2D texture = null;
 
 			try {
-				_camera.targetTexture = temporaryTexture;
-				_camera.aspect = _captureWorldSize.x / _captureWorldSize.y;
-				_camera.Render();
+				camera.targetTexture = temporaryTexture;
+				camera.aspect = _captureWorldSize.x / _captureWorldSize.y;
+				camera.Render();
 				RenderTexture.active = temporaryTexture;
 
 				texture = new Texture2D(pixelSize.x, pixelSize.y, TextureFormat.RGBA32, false);
@@ -311,7 +319,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 				throw;
 			}
 			finally {
-				_camera.targetTexture = previousTargetTexture;
+				camera.targetTexture = previousTargetTexture;
 				RenderTexture.active = previousActiveTexture;
 				RenderTexture.ReleaseTemporary(temporaryTexture);
 			}
@@ -319,20 +327,21 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 
 #if UNITY_EDITOR
 		void EnsurePreviewTexture() {
-			Vector2Int pixelSize = GetPixelSize();
+			Vector2Int pixelSize = OutputTextureSize;
+			Camera camera = Camera;
 
 			if (_previewRenderTexture != null &&
 			    _previewRenderTexture.width == pixelSize.x &&
 			    _previewRenderTexture.height == pixelSize.y) {
 				_previewRenderTexture.filterMode = _filterMode;
-				_camera.targetTexture = _previewRenderTexture;
-				_camera.enabled = true;
+				camera.targetTexture = _previewRenderTexture;
+				camera.enabled = true;
 				return;
 			}
 
 			ReleasePreviewTexture();
-			_previousTargetTexture = _camera.targetTexture;
-			_previousCameraEnabled = _camera.enabled;
+			_previousTargetTexture = camera.targetTexture;
+			_previousCameraEnabled = camera.enabled;
 			_previewRenderTexture = new RenderTexture(
 				pixelSize.x,
 				pixelSize.y,
@@ -345,8 +354,8 @@ namespace ParkMinPackages.Workflow.Minimap.Components.Actors
 			_previewRenderTexture.wrapMode = TextureWrapMode.Clamp;
 			_previewRenderTexture.hideFlags = HideFlags.HideAndDontSave;
 			_previewRenderTexture.Create();
-			_camera.targetTexture = _previewRenderTexture;
-			_camera.enabled = true;
+			camera.targetTexture = _previewRenderTexture;
+			camera.enabled = true;
 		}
 
 		void ReleasePreviewTexture() {

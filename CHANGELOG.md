@@ -5,6 +5,22 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-08-25
+
+### Breaking Changes
+- Replaced the C# auto-run fitting and tracking controllers with dependency-validated Unity components.
+- Extracted smoothing from `MiniMapUI` into `MiniMapUISmoother` and changed `IMiniMapUI` view properties to read-only values controlled through setter methods.
+- Replaced direct marker target assignment with explicit `MiniMapMarkerUI.Initialize()` lifecycle management.
+- Removed `IAutoRunController` and the previous object-based minimap controller implementations.
+
+### Added
+- Added `MiniMapUIFitter`, `MiniMapUIFitUpdater`, `MiniMapUISmoother`, and `MiniMapUITargetTrackingUpdater` components.
+- Added serialized-field classification for required dependencies, injectable dependencies, and settings.
+
+### Changed
+- Migrated `MiniMapCamera` editor updates to `IR3Updatable` and simplified its cached camera, world-center, and output-size calculations.
+- Updated `MiniMapUI` marker registration, initialization, and view refresh flow.
+
 ## [4.3.0] - 2026-08-23
 
 ### Added

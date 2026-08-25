@@ -9,11 +9,13 @@ namespace ParkMinPackages.Workflow.Minimap.Interfaces
 			float rotation,
 			float viewWorldHeight
 		);
-		Vector2 WorldToMiniMapPoint(Vector3 worldPosition);
+		void SetCenter(Vector3 center);
+		void SetRotation(float rotation);
+		void SetViewWorldHeight(float viewWorldHeight);
 
-		Vector3 Center { get; set; }
-		float Rotation { get; set; }
-		float ViewWorldHeight { get; set; }
+		Vector3 Center { get; }
+		float Rotation { get; }
+		float ViewWorldHeight { get; }
 		float ViewAspectRatio { get; }
 	}
 }

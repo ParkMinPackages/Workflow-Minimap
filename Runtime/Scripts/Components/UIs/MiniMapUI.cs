@@ -1,11 +1,13 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+using ParkMinPackages.Foundation.Constants;
 using ParkMinPackages.Foundation.Interfaces;
-using ParkMinPackages.Workflow.Default.Components;
 using ParkMinPackages.Workflow.Default.Components.UIs;
 using ParkMinPackages.Workflow.Minimap.Components.Actors;
 using ParkMinPackages.Workflow.Minimap.Interfaces;
+using R3;
+using R3.Triggers;
 using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,22 +15,24 @@ using UnityEngine.UI;
 namespace ParkMinPackages.Workflow.Minimap
 {
 	[RequireComponent(typeof(RectMask2D))]
-	public class MiniMapUI : BasicUI, IMiniMapUI, IR3PostLateUpdatable
+	public class MiniMapUI : BasicUI, IMiniMapUI, IEnumerable<MiniMapMarkerUI>, IR3PostLateUpdatable
 	{
 		// - Public Methods -
 		public void Initialize(MiniMapCamera miniMapCamera) {
-			if (miniMapCamera == null) throw new NullReferenceException();
-			InitializeHierarchy();
+			if (miniMapCamera == null)
+				throw new ArgumentNullException(nameof(miniMapCamera));
+			if (MiniMapImage == null)
+				throw new NullReferenceException(nameof(MiniMapImage));
+			if (MiniMapImage.rectTransform.parent != transform)
+				throw new InvalidOperationException($"{nameof(MiniMapImage)} must be a direct child of {nameof(MiniMapUI)}.");
 
 			MiniMapCamera.SpriteCaptureData captureData = miniMapCamera.CaptureSprite();
 			_captureData?.Dispose();
 			_captureData = captureData;
-			_miniMapImage.sprite = captureData.Sprite;
-			_miniMapImage.SetNativeSize();
-			_center = new Vector3(captureData.WorldCenter.x, 0f, captureData.WorldCenter.y);
-			_viewVersion++;
-			ApplyView();
-			FindMarkers();
+			MiniMapImage.sprite = captureData.Sprite;
+			MiniMapImage.SetNativeSize();
+			MiniMapImage.rectTransform.SetAsFirstSibling();
+			SetView(new Vector3(captureData.WorldCenter.x, 0f, captureData.WorldCenter.y), Rotation, ViewWorldHeight);
 		}
 
 		public void SetView(
@@ -36,56 +40,79 @@ namespace ParkMinPackages.Workflow.Minimap
 			float rotation,
 			float viewWorldHeight
 		) {
-			float validatedViewWorldHeight = Mathf.Max(0.01f, viewWorldHeight);
-			if (_smoothingEnabled) {
-				_targetCenter = center;
-				_targetRotation = rotation;
-				_targetViewWorldHeight = validatedViewWorldHeight;
-				_hasTargetView = true;
-				return;
-			}
-
-			SetViewImmediate(center, rotation, validatedViewWorldHeight);
+			Center = center;
+			Rotation = rotation;
+			ViewWorldHeight = Mathf.Max(0.01f, viewWorldHeight);
+			RefreshView();
 		}
-		public void SnapToTargetView() {
-			if (_hasTargetView == false)
+
+		public void SetCenter(Vector3 center) {
+			SetView(center, Rotation, ViewWorldHeight);
+		}
+		public void SetRotation(float rotation) {
+			SetView(Center, rotation, ViewWorldHeight);
+		}
+		public void SetViewWorldHeight(float viewWorldHeight) {
+			SetView(Center, Rotation, viewWorldHeight);
+		}
+
+		public void RefreshView() {
+			if (_captureData == null || MiniMapImage == null || MiniMapImage.sprite == null)
 				return;
 
-			_hasTargetView = false;
-			SetViewImmediate(_targetCenter, _targetRotation, _targetViewWorldHeight);
-			UpdateMarkers();
+			RectTransform frameRectTransform = (RectTransform)transform;
+			Vector2 frameSize = frameRectTransform.rect.size;
+			if (frameSize.x <= 0f || frameSize.y <= 0f)
+				return;
+
+			float uiSizePerWorldUnit = frameSize.y / ViewWorldHeight;
+			Vector2 imageSize = _captureData.WorldSize * uiSizePerWorldUnit;
+			Rect worldRect = _captureData.WorldRect;
+			Vector2 normalizedCenter = new Vector2(
+				Mathf.InverseLerp(worldRect.xMin, worldRect.xMax, Center.x),
+				Mathf.InverseLerp(worldRect.yMin, worldRect.yMax, Center.z)
+			);
+
+			RectTransform imageRectTransform = MiniMapImage.rectTransform;
+			imageRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+			imageRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+			imageRectTransform.pivot = normalizedCenter;
+			imageRectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, imageSize.x);
+			imageRectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, imageSize.y);
+			imageRectTransform.anchoredPosition = Vector2.zero;
+			imageRectTransform.localRotation = Quaternion.Euler(0f, 0f, Rotation);
 		}
 
 		public Vector2 WorldToMiniMapPoint(Vector3 worldPosition) {
-			if (_captureData == null)
+			if (IsInitialized == false)
 				throw new InvalidOperationException($"{nameof(MiniMapUI)} is not initialized.");
-			if (_markerContainer == null)
-				throw new NullReferenceException(nameof(_markerContainer));
 
-			Rect worldRect = _captureData.WorldRect;
+			Rect worldRect = WorldRect;
 			Vector2 normalizedPoint = new Vector2(
 				(worldPosition.x - worldRect.xMin) / worldRect.width,
 				(worldPosition.z - worldRect.yMin) / worldRect.height
 			);
-			RectTransform imageRectTransform = _miniMapImage.rectTransform;
+			RectTransform imageRectTransform = MiniMapImage.rectTransform;
 			Rect imageRect = imageRectTransform.rect;
 			Vector2 imagePoint = new Vector2(
 				Mathf.LerpUnclamped(imageRect.xMin, imageRect.xMax, normalizedPoint.x),
 				Mathf.LerpUnclamped(imageRect.yMin, imageRect.yMax, normalizedPoint.y)
 			);
 			Vector3 worldPoint = imageRectTransform.TransformPoint(imagePoint);
-			return _markerContainer.InverseTransformPoint(worldPoint);
+			return MarkerContainer.InverseTransformPoint(worldPoint);
 		}
 
 		public T CreateMarker<T>(Transform target, T markerPrefab) where T : MiniMapMarkerUI {
-			if (target == null) throw new ArgumentNullException(nameof(target));
-			if (markerPrefab == null) throw new ArgumentNullException(nameof(markerPrefab));
-			if (_markerContainer == null) throw new NullReferenceException(nameof(_markerContainer));
+			if (target == null)
+				throw new ArgumentNullException(nameof(target));
+			if (markerPrefab == null)
+				throw new ArgumentNullException(nameof(markerPrefab));
 
-			T marker = Instantiate(markerPrefab, _markerContainer);
-			marker.Target = target;
-			AddMarker(marker);
-			return marker;
+			T markerUI = Instantiate(markerPrefab, MarkerContainer);
+			markerUI.Initialize(target);
+			_markers.Add(markerUI);
+			markerUI.OnDestroyAsObservable().Subscribe(_ => _markers.Remove(markerUI)).AddTo(gameObject);
+			return markerUI;
 		}
 
 		public void DestroyMarker(
@@ -95,13 +122,13 @@ namespace ParkMinPackages.Workflow.Minimap
 			if (markerUI == null)
 				return;
 
-			RemoveMarker(markerUI);
-			Action<MiniMapMarkerUI> resolvedDestroyAction = destroyAction ?? markerUI.DestroyAction;
-			if (resolvedDestroyAction != null)
-				resolvedDestroyAction(markerUI);
+			_markers.Remove(markerUI);
+			if (destroyAction != null)
+				destroyAction(markerUI);
 			else
 				Destroy(markerUI.gameObject);
 		}
+
 		public void ClearMarkers(
 			Action<MiniMapMarkerUI> destroyAction = null
 		) {
@@ -110,12 +137,19 @@ namespace ParkMinPackages.Workflow.Minimap
 				DestroyMarker(markerUIs[i], destroyAction);
 		}
 
-		public void R3PostLateUpdate() {
-			UpdateSmoothedView();
-			UpdateMarkers();
+		public IEnumerator<MiniMapMarkerUI> GetEnumerator() {
+			return _markers.GetEnumerator();
+		}
+
+		IEnumerator IEnumerable.GetEnumerator() {
+			return GetEnumerator();
 		}
 
 		// - Public Properties -
+		public bool InitializeOnStart
+		{
+			get { return _initializeOnStart; }
+		}
 		public Image MiniMapImage
 		{
 			get { return _miniMapImage; }
@@ -128,226 +162,73 @@ namespace ParkMinPackages.Workflow.Minimap
 		{
 			get { return _markers; }
 		}
-		public Vector3 Center
+		public int Count
 		{
-			get { return _smoothingEnabled && _hasTargetView ? _targetCenter : _center; }
-			set { SetView(value, Rotation, ViewWorldHeight); }
+			get { return _markers.Count; }
 		}
-		public float Rotation
-		{
-			get { return _smoothingEnabled && _hasTargetView ? _targetRotation : _rotation; }
-			set { SetView(Center, value, ViewWorldHeight); }
-		}
+		public Vector3 Center { get; private set; }
+		public float Rotation { get; private set; }
 		public float ViewWorldHeight
 		{
-			get { return _smoothingEnabled && _hasTargetView ? _targetViewWorldHeight : _viewWorldHeight; }
-			set { SetView(Center, Rotation, value); }
+			get { return _viewWorldHeight; }
+			private set { _viewWorldHeight = value; }
 		}
 		public float ViewAspectRatio
 		{
+			get { return ((RectTransform)transform).rect.height <= 0f ? 1f : ((RectTransform)transform).rect.width / ((RectTransform)transform).rect.height; }
+		}
+		public bool IsInitialized
+		{
+			get { return _captureData != null; }
+		}
+		public Rect WorldRect
+		{
 			get
 			{
-				Rect rect = ((RectTransform)transform).rect;
-				return rect.height <= 0f ? 1f : rect.width / rect.height;
-			}
-		}
-		public bool SmoothingEnabled
-		{
-			get { return _smoothingEnabled; }
-			set
-			{
-				if (_smoothingEnabled == value)
-					return;
-
-				_smoothingEnabled = value;
-				if (_smoothingEnabled) {
-					_targetCenter = _center;
-					_targetRotation = _rotation;
-					_targetViewWorldHeight = _viewWorldHeight;
-					_hasTargetView = true;
-				}
-				else if (_hasTargetView) {
-					SetViewImmediate(_targetCenter, _targetRotation, _targetViewWorldHeight);
-				}
-			}
-		}
-		public float Smoothness
-		{
-			get { return _smoothness; }
-			set
-			{
-				if (value <= 0f) throw new ArgumentOutOfRangeException(nameof(value));
-				_smoothness = value;
+				if (_captureData == null)
+					throw new InvalidOperationException($"{nameof(MiniMapUI)} is not initialized.");
+				return _captureData.WorldRect;
 			}
 		}
 
 		// - Handler -
-		protected override void Start() {
-			base.Start();
-			if (_initializeOnStart) {
-				MiniMapCamera miniMapCamera = null;
-				if (Application.isPlaying)
-					miniMapCamera = Actor.GetEnumerable<MiniMapCamera>().FirstOrDefault(camera => camera.ID == ID);
-				else
-					miniMapCamera = FindObjectsByType<MiniMapCamera>().FirstOrDefault(camera => camera.ID == ID);
-
-				Initialize(miniMapCamera);
-			}
-		}
-
-		void OnRectTransformDimensionsChange() {
-			_viewVersion++;
-			ApplyView();
-		}
-
-		protected override void OnDestroy() {
-			for (int i = 0; i < _markers.Count; i++) {
-				if (_markers[i] != null)
-					_markers[i].DestroyRequested -= HandleMarkerDestroyRequested;
-			}
-			_markers.Clear();
-			_captureData?.Dispose();
-			_captureData = null;
-			base.OnDestroy();
-		}
-
-		// - Internals -
-		[SerializeField] bool _initializeOnStart;
-		[SerializeField, Required] Image _miniMapImage;
-		[SerializeField, Required] RectTransform _markerContainer;
-		[SerializeField, Min(0.01f)] float _viewWorldHeight = 30f;
-		[SerializeField] bool _smoothingEnabled;
-		[SerializeField, ShowIf(nameof(_smoothingEnabled)), Min(0.01f)] float _smoothness = 10f;
-		readonly List<MiniMapMarkerUI> _markers = new List<MiniMapMarkerUI>();
-		MiniMapCamera.SpriteCaptureData _captureData;
-		Vector3 _center;
-		Vector3 _targetCenter;
-		float _rotation;
-		float _targetRotation;
-		float _targetViewWorldHeight;
-		int _viewVersion;
-		bool _hasTargetView;
-
-		void InitializeHierarchy() {
-			if (_miniMapImage == null)
-				throw new NullReferenceException(nameof(_miniMapImage));
-			if (_markerContainer == null)
-				throw new NullReferenceException(nameof(_markerContainer));
-			if (_miniMapImage.rectTransform.parent != transform)
-				throw new InvalidOperationException($"{nameof(MiniMapImage)} must be a direct child of {nameof(MiniMapUI)}.");
-			if (_markerContainer.parent != transform)
-				throw new InvalidOperationException($"{nameof(MarkerContainer)} must be a direct child of {nameof(MiniMapUI)}.");
-
+		protected override void Awake() {
+			base.Awake();
 			_markerContainer.anchorMin = Vector2.zero;
 			_markerContainer.anchorMax = Vector2.one;
 			_markerContainer.offsetMin = Vector2.zero;
 			_markerContainer.offsetMax = Vector2.zero;
 			_markerContainer.localScale = Vector3.one;
-			_miniMapImage.rectTransform.SetAsFirstSibling();
 			_markerContainer.SetAsLastSibling();
 		}
 
-		void SetViewImmediate(
-			Vector3 center,
-			float rotation,
-			float viewWorldHeight
-		) {
-			bool changed = _center != center ||
-			               Mathf.Approximately(_rotation, rotation) == false ||
-			               Mathf.Approximately(_viewWorldHeight, viewWorldHeight) == false;
-			_center = center;
-			_rotation = rotation;
-			_viewWorldHeight = viewWorldHeight;
-			if (changed)
-				_viewVersion++;
-			ApplyView();
-		}
+		protected override void Start() {
+			base.Start();
+			if (InitializeOnStart)
+				Initialize(_initializeOnStartMiniMapCamera);
 
-		void UpdateSmoothedView() {
-			if (_smoothingEnabled == false || _hasTargetView == false)
-				return;
-			if (_center == _targetCenter &&
-			    Mathf.Approximately(_rotation, _targetRotation) &&
-			    Mathf.Approximately(_viewWorldHeight, _targetViewWorldHeight))
-				return;
+			List<MiniMapMarkerUI> markerUIs = new List<MiniMapMarkerUI>();
+			MarkerContainer.GetComponentsInChildren(true, markerUIs);
+			for (int i = 0; i < markerUIs.Count; i++) {
+				MiniMapMarkerUI markerUI = markerUIs[i];
+				if (markerUI.Target == null) {
+					Destroy(markerUI.gameObject);
+					continue;
+				}
+				if (_markers.Contains(markerUI))
+					continue;
 
-			float interpolation = 1f - Mathf.Exp(-_smoothness * Time.deltaTime);
-			Vector3 center = Vector3.Lerp(_center, _targetCenter, interpolation);
-			float rotation = Mathf.LerpAngle(_rotation, _targetRotation, interpolation);
-			float viewWorldHeight = Mathf.Lerp(_viewWorldHeight, _targetViewWorldHeight, interpolation);
-			if ((center - _targetCenter).sqrMagnitude <= 0.000001f)
-				center = _targetCenter;
-			if (Mathf.Abs(Mathf.DeltaAngle(rotation, _targetRotation)) <= 0.001f)
-				rotation = _targetRotation;
-			if (Mathf.Abs(viewWorldHeight - _targetViewWorldHeight) <= 0.001f)
-				viewWorldHeight = _targetViewWorldHeight;
-			SetViewImmediate(center, rotation, viewWorldHeight);
-		}
-
-		void ApplyView() {
-			if (_captureData == null || _miniMapImage == null || _miniMapImage.sprite == null)
-				return;
-
-			RectTransform frameRectTransform = (RectTransform)transform;
-			Vector2 frameSize = frameRectTransform.rect.size;
-			if (frameSize.x <= 0f || frameSize.y <= 0f)
-				return;
-
-			float uiSizePerWorldUnit = frameSize.y / _viewWorldHeight;
-			Vector2 imageSize = _captureData.WorldSize * uiSizePerWorldUnit;
-			Rect worldRect = _captureData.WorldRect;
-			Vector2 normalizedCenter = new Vector2(
-				Mathf.InverseLerp(worldRect.xMin, worldRect.xMax, _center.x),
-				Mathf.InverseLerp(worldRect.yMin, worldRect.yMax, _center.z)
-			);
-
-			RectTransform imageRectTransform = _miniMapImage.rectTransform;
-			imageRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-			imageRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-			imageRectTransform.pivot = normalizedCenter;
-			imageRectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, imageSize.x);
-			imageRectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, imageSize.y);
-			imageRectTransform.anchoredPosition = Vector2.zero;
-			imageRectTransform.localRotation = Quaternion.Euler(0f, 0f, _rotation);
-		}
-
-		void FindMarkers() {
-			for (int i = 0; i < _markers.Count; i++) {
-				if (_markers[i] != null)
-					_markers[i].DestroyRequested -= HandleMarkerDestroyRequested;
-			}
-			_markers.Clear();
-			if (_markerContainer == null)
-				return;
-
-			_markerContainer.GetComponentsInChildren(true, _markers);
-			for (int i = 0; i < _markers.Count; i++) {
-				MiniMapMarkerUI markerUI = _markers[i];
-				markerUI.DestroyRequested += HandleMarkerDestroyRequested;
-				markerUI.Refresh();
+				_markers.Add(markerUI);
+				markerUI.OnDestroyAsObservable().Subscribe(_ => _markers.Remove(markerUI)).AddTo(gameObject);
 			}
 		}
 
-		void AddMarker(MiniMapMarkerUI markerUI) {
-			if (_markers.Contains(markerUI))
-				return;
-
-			_markers.Add(markerUI);
-			markerUI.DestroyRequested += HandleMarkerDestroyRequested;
-			markerUI.Refresh();
+		protected void OnRectTransformDimensionsChange() {
+			RefreshView();
 		}
 
-		void RemoveMarker(MiniMapMarkerUI markerUI) {
-			if (_markers.Remove(markerUI))
-				markerUI.DestroyRequested -= HandleMarkerDestroyRequested;
-		}
-
-		void HandleMarkerDestroyRequested(MiniMapMarkerUI markerUI) {
-			DestroyMarker(markerUI);
-		}
-
-		void UpdateMarkers() {
-			if (_captureData == null || _markerContainer == null)
+		void IR3PostLateUpdatable.R3PostLateUpdate() {
+			if (IsInitialized == false)
 				return;
 
 			for (int i = _markers.Count - 1; 0 <= i; i--) {
@@ -361,48 +242,58 @@ namespace ParkMinPackages.Workflow.Minimap
 					markerUI.Hide();
 					continue;
 				}
-				if (markerUI.IsTargetStatic && markerUI.AppliedViewVersion == _viewVersion)
+
+				Vector2 markerPoint = WorldToMiniMapPoint(markerUI.WorldPosition);
+				Rect containerRect = MarkerContainer.rect;
+				bool isOutOfBounds = containerRect.Contains(markerPoint) == false;
+				markerUI.SetOutOfBounds(isOutOfBounds);
+				if (markerUI.OutOfBounds == MiniMapMarkerUI.OutOfBoundsMode.Hide && isOutOfBounds) {
+					markerUI.Hide();
 					continue;
+				}
 
-				ApplyMarker(markerUI);
-				markerUI.AppliedViewVersion = _viewVersion;
+				RectTransform markerRectTransform = markerUI.RectTransform;
+				Vector3 localPosition = markerRectTransform.localPosition;
+				markerRectTransform.localPosition = new Vector3(markerPoint.x, markerPoint.y, localPosition.z);
+				markerRectTransform.localRotation = markerUI.Rotation == MiniMapMarkerUI.RotationMode.WorldDirection
+					? Quaternion.Euler(0f, 0f, Rotation - markerUI.WorldYaw)
+					: Quaternion.identity;
+
+				if (markerUI.OutOfBounds == MiniMapMarkerUI.OutOfBoundsMode.Clamp) {
+					Bounds markerBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(MarkerContainer, markerRectTransform);
+					Vector3 correction = Vector3.zero;
+					if (markerBounds.min.x < containerRect.xMin)
+						correction.x = containerRect.xMin - markerBounds.min.x;
+					else if (containerRect.xMax < markerBounds.max.x)
+						correction.x = containerRect.xMax - markerBounds.max.x;
+					if (markerBounds.min.y < containerRect.yMin)
+						correction.y = containerRect.yMin - markerBounds.min.y;
+					else if (containerRect.yMax < markerBounds.max.y)
+						correction.y = containerRect.yMax - markerBounds.max.y;
+					markerRectTransform.localPosition += correction;
+				}
+				markerUI.Show();
 			}
 		}
 
-		void ApplyMarker(MiniMapMarkerUI markerUI) {
-			Vector2 markerPoint = WorldToMiniMapPoint(markerUI.WorldPosition);
-			Rect containerRect = _markerContainer.rect;
-			bool isOutOfBounds = containerRect.Contains(markerPoint) == false;
-			markerUI.SetOutOfBounds(isOutOfBounds);
-			if (markerUI.OutOfBounds == MiniMapMarkerUI.OutOfBoundsMode.Hide && isOutOfBounds) {
-				markerUI.Hide();
-				return;
-			}
-
-			RectTransform markerRectTransform = markerUI.RectTransform;
-			Vector3 localPosition = markerRectTransform.localPosition;
-			markerRectTransform.localPosition = new Vector3(markerPoint.x, markerPoint.y, localPosition.z);
-			markerRectTransform.localRotation = markerUI.Rotation == MiniMapMarkerUI.RotationMode.WorldDirection
-				? Quaternion.Euler(0f, 0f, _rotation - markerUI.WorldYaw)
-				: Quaternion.identity;
-
-			if (markerUI.OutOfBounds == MiniMapMarkerUI.OutOfBoundsMode.Clamp)
-				ClampMarker(markerRectTransform, containerRect);
-			markerUI.Show();
+		protected override void OnDestroy() {
+			_markers.Clear();
+			_captureData?.Dispose();
+			_captureData = null;
+			base.OnDestroy();
 		}
 
-		void ClampMarker(RectTransform markerRectTransform, Rect containerRect) {
-			Bounds markerBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(_markerContainer, markerRectTransform);
-			Vector3 correction = Vector3.zero;
-			if (markerBounds.min.x < containerRect.xMin)
-				correction.x = containerRect.xMin - markerBounds.min.x;
-			else if (containerRect.xMax < markerBounds.max.x)
-				correction.x = containerRect.xMax - markerBounds.max.x;
-			if (markerBounds.min.y < containerRect.yMin)
-				correction.y = containerRect.yMin - markerBounds.min.y;
-			else if (containerRect.yMax < markerBounds.max.y)
-				correction.y = containerRect.yMax - markerBounds.max.y;
-			markerRectTransform.localPosition += correction;
-		}
+		// - Internals -
+		[Title(Headers.Required)]
+		[SerializeField, Required] Image _miniMapImage;
+		[SerializeField, Required] RectTransform _markerContainer;
+
+		[Title(Headers.Settings)]
+		[SerializeField] bool _initializeOnStart;
+		[ShowIf(nameof(_initializeOnStart)), SerializeField, Required] MiniMapCamera _initializeOnStartMiniMapCamera;
+		[SerializeField, Min(0.01f)] float _viewWorldHeight = 30f;
+
+		MiniMapCamera.SpriteCaptureData _captureData;
+		readonly List<MiniMapMarkerUI> _markers = new List<MiniMapMarkerUI>();
 	}
 }
