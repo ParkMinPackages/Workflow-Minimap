@@ -3,8 +3,8 @@ using Cysharp.Threading.Tasks;
 using ParkMinPackages.Foundation.Constants;
 using ParkMinPackages.Foundation.Objects.Threading;
 using ParkMinPackages.UGUI.Components;
-using ParkMinPackages.Workflow.Default.Components;
 using ParkMinPackages.Workflow.Default.Interfaces;
+using ParkMinPackages.Workflow.Minimap.Enums;
 using R3;
 using R3.Triggers;
 using Sirenix.OdinInspector;
@@ -14,7 +14,7 @@ using UnityEngine.UI;
 namespace ParkMinPackages.Workflow.Minimap
 {
 	[RequireComponent(typeof(Image))]
-	public class MiniMapMarkerUI : Actor, IShowHideUI
+	public class MiniMapMarkerUI : MiniMapElementUI, IShowHideUI
 	{
 		// - Class Struct Enum -
 		public enum RotationMode
@@ -38,6 +38,22 @@ namespace ParkMinPackages.Workflow.Minimap
 			_target = target;
 			Refresh();
 			_targetDestroySubscription = _target.OnDestroyAsObservable().Subscribe(_ => Destroy(gameObject));
+		}
+		public override void RefreshView() {
+			if (Target == null) {
+				SetOutOfBounds(false);
+				Hide();
+				return;
+			}
+
+			Vector2 markerPoint = WorldToElementPoint(WorldPosition);
+			Vector3 localPosition = RectTransform.localPosition;
+			RectTransform.localPosition = new Vector3(markerPoint.x, markerPoint.y, localPosition.z);
+			ApplyRotation();
+			if (ApplyOutOfBounds() == false)
+				return;
+
+			Show();
 		}
 
 		public void Show() {
@@ -83,15 +99,6 @@ namespace ParkMinPackages.Workflow.Minimap
 				return _image;
 			}
 		}
-		public RectTransform RectTransform
-		{
-			get
-			{
-				if (_rectTransform == null)
-					_rectTransform = (RectTransform)transform;
-				return _rectTransform;
-			}
-		}
 		public Sprite Icon
 		{
 			get { return Image.sprite; }
@@ -123,7 +130,6 @@ namespace ParkMinPackages.Workflow.Minimap
 		protected override void Awake() {
 			base.Awake();
 			_image = GetComponent<Image>();
-			_rectTransform = (RectTransform)transform;
 			_uiActivator = GetComponent<UIActivator>();
 			_isVisible = _uiActivator != null ? _uiActivator.IsActive : _image.enabled;
 			if (_target != null)
@@ -138,7 +144,57 @@ namespace ParkMinPackages.Workflow.Minimap
 			base.OnDestroy();
 		}
 
-		// - Internals -
+		// - Private & Protected -
+		void ApplyRotation() {
+			float rotation = Layer switch
+			{
+				MiniMapElementLayer.Map => Rotation == RotationMode.WorldDirection ? -WorldYaw : -MiniMapUI.Rotation,
+				MiniMapElementLayer.Overlay => Rotation == RotationMode.WorldDirection ? MiniMapUI.Rotation - WorldYaw : 0f,
+				_ => throw new ArgumentOutOfRangeException(nameof(Layer), Layer, null)
+			};
+			RectTransform.localRotation = Quaternion.Euler(0f, 0f, rotation);
+		}
+		bool ApplyOutOfBounds() {
+			RectTransform frameRectTransform = (RectTransform)MiniMapUI.transform;
+			Rect frameRect = frameRectTransform.rect;
+			Vector3 markerFramePoint = frameRectTransform.InverseTransformPoint(RectTransform.position);
+			bool isOutOfBounds = frameRect.Contains(markerFramePoint) == false;
+			SetOutOfBounds(isOutOfBounds);
+			if (OutOfBounds == OutOfBoundsMode.Hide && isOutOfBounds) {
+				Hide();
+				return false;
+			}
+
+			if (OutOfBounds != OutOfBoundsMode.Clamp)
+				return true;
+
+			Bounds markerBounds = RectTransformUtility.CalculateRelativeRectTransformBounds(frameRectTransform, RectTransform);
+			Vector3 correction = Vector3.zero;
+			if (markerBounds.min.x < frameRect.xMin)
+				correction.x = frameRect.xMin - markerBounds.min.x;
+			else if (frameRect.xMax < markerBounds.max.x)
+				correction.x = frameRect.xMax - markerBounds.max.x;
+			if (markerBounds.min.y < frameRect.yMin)
+				correction.y = frameRect.yMin - markerBounds.min.y;
+			else if (frameRect.yMax < markerBounds.max.y)
+				correction.y = frameRect.yMax - markerBounds.max.y;
+
+			Vector3 worldCorrection = frameRectTransform.TransformVector(correction);
+			RectTransform.localPosition += RectTransform.parent.InverseTransformVector(worldCorrection);
+			return true;
+		}
+		void SetOutOfBounds(bool isOutOfBounds) {
+			_isOutOfBounds.Value = isOutOfBounds;
+		}
+		Vector3 WorldPosition
+		{
+			get { return IsTargetStatic ? _cachedWorldPosition : _target.position; }
+		}
+		float WorldYaw
+		{
+			get { return IsTargetStatic ? _cachedWorldYaw : _target.eulerAngles.y; }
+		}
+
 		[Title(Headers.Injectable)]
 		[SerializeField] Transform _target;
 
@@ -149,23 +205,10 @@ namespace ParkMinPackages.Workflow.Minimap
 		readonly AutoRenewCancellationTokenSource _showHideCancellationTokenSource = new AutoRenewCancellationTokenSource();
 		readonly ReactiveProperty<bool> _isOutOfBounds = new ReactiveProperty<bool>(false);
 		Image _image;
-		RectTransform _rectTransform;
 		UIActivator _uiActivator;
 		IDisposable _targetDestroySubscription;
 		Vector3 _cachedWorldPosition;
 		float _cachedWorldYaw;
 		bool _isVisible = true;
-
-		internal Vector3 WorldPosition
-		{
-			get { return IsTargetStatic ? _cachedWorldPosition : _target.position; }
-		}
-		internal float WorldYaw
-		{
-			get { return IsTargetStatic ? _cachedWorldYaw : _target.eulerAngles.y; }
-		}
-		internal void SetOutOfBounds(bool isOutOfBounds) {
-			_isOutOfBounds.Value = isOutOfBounds;
-		}
 	}
 }

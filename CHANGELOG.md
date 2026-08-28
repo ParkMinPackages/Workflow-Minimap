@@ -5,6 +5,20 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.0.0] - 2026-08-28
+
+### Breaking Changes
+- Replaced marker-specific creation, removal, collection, container, and coordinate APIs with generalized minimap element APIs.
+- Required separate map and overlay element containers as direct children of `MiniMapUI`.
+- Changed `MiniMapMarkerUI` to inherit from `MiniMapElementUI` and own its view refresh behavior.
+
+### Added
+- Added `MiniMapElementUI` and `MiniMapElementLayer` for extensible map and overlay elements.
+- Added public world-to-map and world-to-overlay coordinate conversions.
+
+### Changed
+- Synchronized the minimap image and map element container from world dimensions while keeping overlay elements independent from map scale and rotation.
+
 ## [5.0.0] - 2026-08-25
 
 ### Breaking Changes
