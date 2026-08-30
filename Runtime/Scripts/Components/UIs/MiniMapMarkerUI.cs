@@ -3,7 +3,6 @@ using Cysharp.Threading.Tasks;
 using ParkMinPackages.Foundation.Constants;
 using ParkMinPackages.Foundation.Objects.Threading;
 using ParkMinPackages.UGUI.Components;
-using ParkMinPackages.Workflow.Default.Interfaces;
 using ParkMinPackages.Workflow.Minimap.Enums;
 using R3;
 using R3.Triggers;
@@ -11,10 +10,10 @@ using Sirenix.OdinInspector;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace ParkMinPackages.Workflow.Minimap
+namespace ParkMinPackages.Workflow.Minimap.Components.UIs
 {
 	[RequireComponent(typeof(Image))]
-	public class MiniMapMarkerUI : MiniMapElementUI, IShowHideUI
+	public class MiniMapMarkerUI : MiniMapElementUI
 	{
 		// - Class Struct Enum -
 		public enum RotationMode

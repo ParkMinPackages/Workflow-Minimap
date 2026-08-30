@@ -3,7 +3,7 @@ using ParkMinPackages.Workflow.Default.Components;
 using ParkMinPackages.Workflow.Minimap.Enums;
 using UnityEngine;
 
-namespace ParkMinPackages.Workflow.Minimap
+namespace ParkMinPackages.Workflow.Minimap.Components.UIs
 {
 	public abstract class MiniMapElementUI : Actor
 	{

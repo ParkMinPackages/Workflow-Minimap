@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 {
-	public sealed class MiniMapUIFitter : DependencyBehaviour
+	public sealed class MiniMapUIFitFeature : Feature<IMiniMapUI>
 	{
 		// - Class Struct Enum -
 		public enum PaddingMode
@@ -17,13 +17,8 @@ namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 		}
 
 		// - Public Methods -
-		public void Initialize(IMiniMapUI miniMapUI) {
-			_miniMapUI = miniMapUI;
-		}
-
 		public override void ValidateDependencies() {
-			if (_miniMapUI == null)
-				throw new InvalidOperationException($"{nameof(MiniMapUI)} is not assigned.");
+			base.ValidateDependencies();
 			if (_viewDirection.sqrMagnitude <= Mathf.Epsilon)
 				throw new ArgumentOutOfRangeException(nameof(ViewDirection));
 			if (_leftPadding < 0f)
@@ -75,7 +70,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 			float bottomPadding,
 			PaddingMode paddingMode
 		) {
-			if (_miniMapUI == null)
+			if (Owner == null)
 				throw new InvalidOperationException($"{nameof(MiniMapUI)} is not assigned.");
 			if (viewDirection.sqrMagnitude <= Mathf.Epsilon)
 				throw new ArgumentOutOfRangeException(nameof(viewDirection));
@@ -129,11 +124,14 @@ namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 				requiredWorldHeight,
 				requiredWorldWidth / viewAspectRatio
 			);
-			MiniMapUI.SetView((pointA + pointB) * 0.5f + centerOffset, rotation, viewWorldHeight);
+			Owner.SetView((pointA + pointB) * 0.5f + centerOffset, rotation, viewWorldHeight);
 		}
 
 		// - Public Properties -
-		public IMiniMapUI MiniMapUI => _miniMapUI;
+		public IMiniMapUI MiniMapUI
+		{
+			get { return Owner; }
+		}
 		public Vector2 ViewDirection
 		{
 			get { return _viewDirection; }
@@ -165,16 +163,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 			set { _paddingMode = value; }
 		}
 
-		// - Handler -
-		void Awake() {
-			if (_miniMapUI == null && _miniMapUIObject != null)
-				_miniMapUI = _miniMapUIObject as IMiniMapUI;
-		}
-
 		// - Internals -
-		[Title(Headers.Injectable)]
-		[SerializeField] UnityEngine.Object _miniMapUIObject;
-
 		[Title(Headers.Settings)]
 		[SerializeField] Vector2 _viewDirection = Vector2.up;
 		[SerializeField] float _leftPadding;
@@ -182,7 +171,5 @@ namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 		[SerializeField] float _topPadding;
 		[SerializeField] float _bottomPadding;
 		[SerializeField] PaddingMode _paddingMode;
-
-		IMiniMapUI _miniMapUI;
 	}
 }

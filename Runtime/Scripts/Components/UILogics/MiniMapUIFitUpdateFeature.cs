@@ -7,31 +7,30 @@ using UnityEngine;
 
 namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 {
-	public sealed class MiniMapUIFitUpdater : DependencyBehaviour, IR3PreLateUpdatable
+	public sealed class MiniMapUIFitUpdateFeature : Feature<MiniMapUIFitFeature>, IR3PreLateUpdatable
 	{
 		// - Public Methods -
-		public void Initialize(MiniMapUIFitter fitter, Transform pointA, Transform pointB) {
-			_fitter = fitter;
-			_pointA = pointA;
-			_pointB = pointB;
-		}
-
 		public override void ValidateDependencies() {
-			if (_fitter == null)
-				throw new InvalidOperationException($"{nameof(Fitter)} is not assigned.");
+			base.ValidateDependencies();
 			if (_pointA == null)
 				throw new InvalidOperationException($"{nameof(PointA)} is not assigned.");
 			if (_pointB == null)
 				throw new InvalidOperationException($"{nameof(PointB)} is not assigned.");
 		}
 
-		public void RefreshFit() => _fitter.Fit(_pointA.position, _pointB.position);
+		public void SetPoints(Transform pointA, Transform pointB) {
+			_pointA = pointA;
+			_pointB = pointB;
+		}
+
+		public void RefreshFit() {
+			Owner.Fit(_pointA.position, _pointB.position);
+		}
 
 		// - Public Properties -
-		public MiniMapUIFitter Fitter
+		public MiniMapUIFitFeature FitFeature
 		{
-			get { return _fitter; }
-			set { _fitter = value; }
+			get { return Owner; }
 		}
 		public Transform PointA
 		{
@@ -56,9 +55,7 @@ namespace ParkMinPackages.Workflow.Minimap.Components.UILogics
 
 		// - Internals -
 		[Title(Headers.Injectable)]
-		[SerializeField] MiniMapUIFitter _fitter;
 		[SerializeField] Transform _pointA;
 		[SerializeField] Transform _pointB;
-
 	}
 }

@@ -15,7 +15,7 @@ using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.UI;
 
-namespace ParkMinPackages.Workflow.Minimap
+namespace ParkMinPackages.Workflow.Minimap.Components.UIs
 {
 	[RequireComponent(typeof(RectMask2D))]
 	public class MiniMapUI : BasicUI, IMiniMapUI, IEnumerable<MiniMapElementUI>, IR3PostLateUpdatable

@@ -3,17 +3,17 @@
   "gitDependencies": [
     {
       "packageName": "com.parkminpackages.foundation",
-      "version": "8.0.0",
+      "version": "10.0.0",
       "url": "https://github.com/ParkMinPackages/Foundation.git"
     },
     {
       "packageName": "com.parkminpackages.ugui",
-      "version": "12.2.3",
+      "version": "13.0.0",
       "url": "https://github.com/ParkMinPackages/UGUI.git"
     },
     {
       "packageName": "com.parkminpackages.workflow.default",
-      "version": "9.1.4",
+      "version": "10.0.0",
       "url": "https://github.com/ParkMinPackages/Workflow-Default.git"
     },
     {
